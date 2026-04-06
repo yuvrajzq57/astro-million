@@ -73,7 +73,7 @@ export default function ReadingPage() {
       <div className="border-b border-purple-800/30 bg-purple-950/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <a href="/" className="text-2xl font-bold text-amber-300 hover:text-amber-400">
-            Jyotish AI
+            Cosmic AI
           </a>
           <div className="flex gap-4">
             <Link href="/onboarding">

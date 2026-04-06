@@ -149,7 +149,7 @@ export default function ChatPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
             <Link href="/" className="text-2xl font-bold text-amber-300 hover:text-amber-400">
-              Jyotish AI
+              Cosmic AI
             </Link>
             <p className="text-sm text-purple-300 mt-1">Chat with {session.userInfo.name}</p>
           </div>

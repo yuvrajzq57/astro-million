@@ -7,9 +7,9 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Cosmic AI - Vedic Astrology Chat',
+  description: 'Chat with your personal AI astrologer and get real-time insights from your birth chart. Ancient Vedic wisdom meets modern AI.',
+  generator: 'Next.js',
   icons: {
     icon: [
       {
