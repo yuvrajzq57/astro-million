@@ -102,12 +102,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('[WhatsApp] Full webhook payload:', JSON.stringify(body, null, 2))
     
-    // WhatsApp webhook format
-    const { 
-      From: fromNumber, 
-      Body: message, 
-      FromUserName: userName = 'User' 
-    } = body
+    // Extract message from WhatsApp webhook structure
+    let fromNumber = null
+    let message = null
+    let userName = 'User'
+
+    if (body.entry && body.entry[0] && body.entry[0].changes) {
+      const changes = body.entry[0].changes
+      if (changes[0] && changes[0].value && changes[0].value.messages) {
+        const messages = changes[0].value.messages
+        if (messages && messages[0]) {
+          const msg = messages[0]
+          fromNumber = msg.from
+          message = msg.text ? msg.text.body : null
+          
+          // Get user name if available
+          if (changes[0].value.contacts && changes[0].value.contacts[0]) {
+            userName = changes[0].value.contacts[0].profile_name || 'User'
+          }
+        }
+      }
+    }
 
     if (!message) {
       console.log('[WhatsApp] No message in payload, returning 200')
