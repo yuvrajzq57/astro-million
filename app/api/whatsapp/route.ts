@@ -9,12 +9,27 @@ async function sendWhatsAppMessage(to: string, message: string) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
 
+  console.log('[WhatsApp] Sending message to:', to)
+  console.log('[WhatsApp] Access Token exists:', !!accessToken)
+  console.log('[WhatsApp] Phone ID exists:', !!phoneNumberId)
+
   if (!accessToken || !phoneNumberId) {
     console.error('WhatsApp credentials not configured')
+    console.error('WHATSAPP_ACCESS_TOKEN:', accessToken ? 'SET' : 'NOT SET')
+    console.error('WHATSAPP_PHONE_NUMBER_ID:', phoneNumberId ? 'SET' : 'NOT SET')
     return null
   }
 
   try {
+    const payload = {
+      messaging_product: "whatsapp",
+      to: to.replace('whatsapp:', ''),
+      type: "text",
+      text: { body: message }
+    }
+    
+    console.log('[WhatsApp] API payload:', JSON.stringify(payload, null, 2))
+
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
       {
@@ -23,22 +38,20 @@ async function sendWhatsAppMessage(to: string, message: string) {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: to.replace('whatsapp:', ''),
-          type: "text",
-          text: { body: message }
-        }),
+        body: JSON.stringify(payload),
       }
     )
 
+    const responseText = await response.text()
+    console.log('[WhatsApp] API response status:', response.status)
+    console.log('[WhatsApp] API response body:', responseText)
+
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('WhatsApp API error:', errorText)
+      console.error('WhatsApp API error:', responseText)
       return null
     }
 
-    return await response.json()
+    return JSON.parse(responseText)
   } catch (error) {
     console.error('Error sending WhatsApp message:', error)
     return null
@@ -87,6 +100,7 @@ function parseOnboardingDetails(message: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('[WhatsApp] Full webhook payload:', JSON.stringify(body, null, 2))
     
     // WhatsApp webhook format
     const { 
@@ -96,6 +110,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!message) {
+      console.log('[WhatsApp] No message in payload, returning 200')
       return NextResponse.json({ status: 'ok' }, { status: 200 })
     }
 
