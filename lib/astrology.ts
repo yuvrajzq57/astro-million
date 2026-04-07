@@ -107,46 +107,65 @@ export async function getBirthChart(
     if (data && data.response) {
       const responseText = data.response.toLowerCase()
       
-      // Extract zodiac signs from the text response
-      // Look for common zodiac sign names
-      const zodiacSigns = [
-        'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
-        'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'
-      ]
-
+      console.log('[v0] Parsing response text:', responseText)
+      
+      // Extract zodiac signs from the structured response
+      // The API returns: "**Zodiac Sign (Sun Sign):** Sagittarius"
+      
       // Extract sun sign (zodiac sign)
-      for (const sign of zodiacSigns) {
-        if (responseText.includes(`${sign} `) || responseText.includes(` ${sign}`)) {
-          sunSign = sign.charAt(0).toUpperCase() + sign.slice(1)
-          break
-        }
+      const sunSignMatch = responseText.match(/\*\*zodiac sign.*?\*\*:\s*([a-z]+)/i)
+      if (sunSignMatch) {
+        sunSign = sunSignMatch[1].charAt(0).toUpperCase() + sunSignMatch[1].slice(1)
       }
-
+      
       // Extract moon sign
-      for (const sign of zodiacSigns) {
-        if (responseText.includes(`moon ${sign}`) || responseText.includes(`${sign} moon`)) {
-          moonSign = sign.charAt(0).toUpperCase() + sign.slice(1)
-          break
-        }
+      const moonSignMatch = responseText.match(/\*\*moon sign\*\*:\s*([a-z]+)/i)
+      if (moonSignMatch) {
+        moonSign = moonSignMatch[1].charAt(0).toUpperCase() + moonSignMatch[1].slice(1)
       }
-
+      
       // Extract ascendant sign
-      for (const sign of zodiacSigns) {
-        if (responseText.includes(`ascendant ${sign}`) || responseText.includes(`${sign} ascendant`) || 
-            responseText.includes(`rising ${sign}`) || responseText.includes(`${sign} rising`)) {
-          ascendantSign = sign.charAt(0).toUpperCase() + sign.slice(1)
-          break
+      const ascendantMatch = responseText.match(/\*\*ascendant.*?\*\*:\s*([a-z]+)/i)
+      if (ascendantMatch) {
+        ascendantSign = ascendantMatch[1].charAt(0).toUpperCase() + ascendantMatch[1].slice(1)
+      }
+      
+      // If still not found, try simpler patterns
+      if (sunSign === 'Unknown') {
+        const lines = responseText.split('\n')
+        for (const line of lines) {
+          if (line.includes('zodiac sign') || line.includes('sun sign')) {
+            const match = line.match(/([a-z]+)\s*$/)
+            if (match) {
+              sunSign = match[1].charAt(0).toUpperCase() + match[1].slice(1)
+              break
+            }
+          }
         }
       }
-
-      // If still not found, try broader search
-      if (sunSign === 'Unknown') {
-        for (const sign of zodiacSigns) {
-          if (responseText.includes(sign)) {
-            sunSign = sign.charAt(0).toUpperCase() + sign.slice(1)
-            moonSign = moonSign === 'Unknown' ? sunSign : moonSign
-            ascendantSign = ascendantSign === 'Unknown' ? sunSign : ascendantSign
-            break
+      
+      if (moonSign === 'Unknown') {
+        const lines = responseText.split('\n')
+        for (const line of lines) {
+          if (line.includes('moon sign')) {
+            const match = line.match(/([a-z]+)\s*$/)
+            if (match) {
+              moonSign = match[1].charAt(0).toUpperCase() + match[1].slice(1)
+              break
+            }
+          }
+        }
+      }
+      
+      if (ascendantSign === 'Unknown') {
+        const lines = responseText.split('\n')
+        for (const line of lines) {
+          if (line.includes('ascendant') || line.includes('rising')) {
+            const match = line.match(/([a-z]+)\s*$/)
+            if (match) {
+              ascendantSign = match[1].charAt(0).toUpperCase() + match[1].slice(1)
+              break
+            }
           }
         }
       }

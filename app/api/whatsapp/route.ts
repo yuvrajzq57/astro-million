@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
       let onboardingData: OnboardingData = onboardingStates.get(fromNumber)
       
       console.log('[WhatsApp] Current onboarding data:', onboardingData)
+      console.log('[WhatsApp] Current users in memory:', Array.from(userProfiles.keys()))
+      console.log('[WhatsApp] Current onboarding states:', Array.from(onboardingStates.keys()))
       
       // First, try to parse single-line format (fallback)
       const singleLineDetails = parseOnboardingDetails(message)
@@ -314,6 +316,7 @@ Place: ${newUserProfile.placeOfBirth}`
         console.log('[WhatsApp] Starting fresh onboarding for new user')
         onboardingData = { step: 'name', data: {} }
         onboardingStates.set(fromNumber, onboardingData)
+        console.log('[WhatsApp] Set new onboarding state:', onboardingData)
         await sendWhatsAppMessage(fromNumber, getOnboardingMessage('name', userName))
         return NextResponse.json({ status: 'ok' }, { status: 200 })
       }
