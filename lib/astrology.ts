@@ -74,7 +74,7 @@ export async function getBirthChart(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(`${process.env.ASTROLOGY_USER_ID || '611768'}:${apiKey}`).toString('base64')}`,
+          'x-astrologyapi-key': apiKey,
         },
         body: JSON.stringify(requestData),
       }

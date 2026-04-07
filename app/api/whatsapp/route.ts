@@ -203,9 +203,17 @@ export async function POST(request: NextRequest) {
 
     // If user is not onboarded, start onboarding
     if (!userProfile) {
-      const onboardingData: OnboardingData = onboardingStates.get(fromNumber) || { 
-        step: 'name', 
-        data: {} 
+      let onboardingData: OnboardingData = onboardingStates.get(fromNumber)
+      
+      console.log('[WhatsApp] Current onboarding data:', onboardingData)
+      
+      // If no onboarding data exists, start fresh
+      if (!onboardingData) {
+        console.log('[WhatsApp] Starting fresh onboarding for new user')
+        onboardingData = { step: 'name', data: {} }
+        onboardingStates.set(fromNumber, onboardingData)
+        await sendWhatsAppMessage(fromNumber, getOnboardingMessage('name', userName))
+        return NextResponse.json({ status: 'ok' }, { status: 200 })
       }
       
       console.log('[WhatsApp] Onboarding step:', onboardingData.step)
@@ -215,14 +223,17 @@ export async function POST(request: NextRequest) {
       switch (onboardingData.step) {
         case 'name':
           // Save name and move to next step
+          console.log('[WhatsApp] Processing name step, received:', message)
           onboardingData.data.name = message.trim()
           onboardingData.step = 'dob'
           onboardingStates.set(fromNumber, onboardingData)
+          console.log('[WhatsApp] Updated onboarding state:', onboardingData)
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('dob'))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
 
         case 'dob':
           // Validate and save date of birth
+          console.log('[WhatsApp] Processing DOB step, received:', message)
           const dateValidation = validateAndParseDate(message.trim())
           if (!dateValidation.valid) {
             await sendWhatsAppMessage(fromNumber, 
@@ -233,11 +244,13 @@ export async function POST(request: NextRequest) {
           onboardingData.data.dateOfBirth = dateValidation.formatted
           onboardingData.step = 'time'
           onboardingStates.set(fromNumber, onboardingData)
+          console.log('[WhatsApp] Updated onboarding state:', onboardingData)
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('time'))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
 
         case 'time':
           // Validate and save time of birth
+          console.log('[WhatsApp] Processing time step, received:', message)
           const timeValidation = validateAndParseTime(message.trim())
           if (!timeValidation.valid) {
             await sendWhatsAppMessage(fromNumber, 
@@ -248,11 +261,13 @@ export async function POST(request: NextRequest) {
           onboardingData.data.timeOfBirth = timeValidation.formatted
           onboardingData.step = 'place'
           onboardingStates.set(fromNumber, onboardingData)
+          console.log('[WhatsApp] Updated onboarding state:', onboardingData)
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('place'))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
 
         case 'place':
           // Validate and save place of birth
+          console.log('[WhatsApp] Processing place step, received:', message)
           const placeValidation = validatePlace(message.trim())
           if (!placeValidation.valid) {
             await sendWhatsAppMessage(fromNumber, 
@@ -262,6 +277,8 @@ export async function POST(request: NextRequest) {
           }
           onboardingData.data.placeOfBirth = placeValidation.formatted
           onboardingData.step = 'completed'
+          
+          console.log('[WhatsApp] Onboarding completed, final data:', onboardingData)
           
           // Send completion message
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('completed'))
@@ -275,6 +292,8 @@ export async function POST(request: NextRequest) {
           
           userProfiles.set(fromNumber, newUserProfile)
           onboardingStates.delete(fromNumber)
+
+          console.log('[WhatsApp] User profile created:', newUserProfile)
 
           // Generate initial reading
           try {
