@@ -47,7 +47,7 @@ export async function getBirthChart(
 
     console.log('[v0] Calling Astrology API with:', { day, month, year, hour, min, place: params.placeOfBirth })
 
-    // Use the planetary positions API to get zodiac signs
+    // Use the chat API to get zodiac signs and birth chart information
     const requestData = {
       language: "en",
       name: params.name,
@@ -65,11 +65,12 @@ export async function getBirthChart(
       ap: "KUNDLI",
       sid: "astro-6",
       ep: "STANDARD",
-      ac: "VEDIC"
+      ac: "VEDIC",
+      q: "What is my zodiac sign, moon sign, and ascendant? Please provide the three main signs in a simple format."
     }
 
     console.log('[v0] API Request:', {
-      url: 'https://json.astrologyapi.com/v1/planetary_positions',
+      url: 'https://json-chat.astrologyapi.com/api/chat',
       headers: {
         'Content-Type': 'application/json',
         'x-astrologyapi-key': apiKey,
@@ -78,7 +79,7 @@ export async function getBirthChart(
     })
 
     const response = await fetch(
-      'https://json.astrologyapi.com/v1/planetary_positions',
+      'https://json-chat.astrologyapi.com/api/chat',
       {
         method: 'POST',
         headers: {
@@ -98,44 +99,60 @@ export async function getBirthChart(
     const data = await response.json()
     console.log('[v0] Astrology API response:', data)
 
-    // Parse the response from planetary positions API
-    // The response should contain planetary data with zodiac signs
+    // Parse the response from chat API to extract zodiac signs
     let sunSign = 'Unknown'
     let moonSign = 'Unknown'
     let ascendantSign = 'Unknown'
 
-    // Try to extract zodiac signs from the response
-    if (data && data.seasons) {
-      // Check if seasons contains zodiac data
-      sunSign = data.seasons.sun_sign || 'Unknown'
-      moonSign = data.seasons.moon_sign || 'Unknown'
-      ascendantSign = data.seasons.ascendant_sign || 'Unknown'
-    }
+    if (data && data.response) {
+      const responseText = data.response.toLowerCase()
+      
+      // Extract zodiac signs from the text response
+      // Look for common zodiac sign names
+      const zodiacSigns = [
+        'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+        'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'
+      ]
 
-    if (data && data.sun) {
-      sunSign = data.sun.sign || data.sun_name || 'Unknown'
-    }
+      // Extract sun sign (zodiac sign)
+      for (const sign of zodiacSigns) {
+        if (responseText.includes(`${sign} `) || responseText.includes(` ${sign}`)) {
+          sunSign = sign.charAt(0).toUpperCase() + sign.slice(1)
+          break
+        }
+      }
 
-    if (data && data.moon) {
-      moonSign = data.moon.sign || data.moon_name || 'Unknown'
-    }
+      // Extract moon sign
+      for (const sign of zodiacSigns) {
+        if (responseText.includes(`moon ${sign}`) || responseText.includes(`${sign} moon`)) {
+          moonSign = sign.charAt(0).toUpperCase() + sign.slice(1)
+          break
+        }
+      }
 
-    if (data && data.ascendant) {
-      ascendantSign = data.ascendant.sign || data.ascendant_name || 'Unknown'
-    }
+      // Extract ascendant sign
+      for (const sign of zodiacSigns) {
+        if (responseText.includes(`ascendant ${sign}`) || responseText.includes(`${sign} ascendant`) || 
+            responseText.includes(`rising ${sign}`) || responseText.includes(`${sign} rising`)) {
+          ascendantSign = sign.charAt(0).toUpperCase() + sign.slice(1)
+          break
+        }
+      }
 
-    // If still unknown, try other possible field names
-    if (sunSign === 'Unknown' && data) {
-      sunSign = data.sun_sign || data.sunName || data.Sun || 'Unknown'
-    }
-    if (moonSign === 'Unknown' && data) {
-      moonSign = data.moon_sign || data.moonName || data.Moon || 'Unknown'
-    }
-    if (ascendantSign === 'Unknown' && data) {
-      ascendantSign = data.ascendant_sign || data.ascendantName || data.Ascendant || 'Unknown'
-    }
+      // If still not found, try broader search
+      if (sunSign === 'Unknown') {
+        for (const sign of zodiacSigns) {
+          if (responseText.includes(sign)) {
+            sunSign = sign.charAt(0).toUpperCase() + sign.slice(1)
+            moonSign = moonSign === 'Unknown' ? sunSign : moonSign
+            ascendantSign = ascendantSign === 'Unknown' ? sunSign : ascendantSign
+            break
+          }
+        }
+      }
 
-    console.log('[v0] Extracted signs:', { sunSign, moonSign, ascendantSign })
+      console.log('[v0] Extracted signs from chat:', { sunSign, moonSign, ascendantSign })
+    }
 
     return {
       name: params.name,
