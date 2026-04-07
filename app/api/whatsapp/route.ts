@@ -5,6 +5,16 @@ import { getBirthChart } from '@/lib/astrology'
 const userProfiles = new Map()
 const onboardingStates = new Map()
 
+interface OnboardingData {
+  step: 'name' | 'dob' | 'time' | 'place' | 'completed'
+  data: {
+    name?: string
+    dateOfBirth?: string
+    timeOfBirth?: string
+    placeOfBirth?: string
+  }
+}
+
 async function sendWhatsAppMessage(to: string, message: string) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
@@ -58,43 +68,94 @@ async function sendWhatsAppMessage(to: string, message: string) {
   }
 }
 
-function getOnboardingForm() {
-  return `🌟 Welcome to Cosmic AI - Your Personal Astrologer! 🌟
+function getOnboardingMessage(step: string, userName?: string): string {
+  switch (step) {
+    case 'name':
+      return `Welcome to Cosmic AI! ${userName ? `Hi ${userName}!` : ''}
 
-I'm here to provide you with personalized Vedic astrology insights. To get started, please provide:
+I'm your personal AI astrologer. Let's create your cosmic profile step by step.
 
-1️⃣ Your Full Name
-2️⃣ Date of Birth (DD/MM/YYYY)
-3️⃣ Time of Birth (HH:MM, 24-hour format)
-4️⃣ Place of Birth (City, Country)
+First, what's your full name?`
 
-You can send all details in one message like:
-"John Doe, 17/08/2002, 16:30, Gaya, India"
+    case 'dob':
+      return `Great! Now, what's your date of birth?
 
-Or send them one by one. Let's begin your cosmic journey! ✨`
+Please reply in this format: DD/MM/YYYY
+Example: 17/08/2002`
+
+    case 'time':
+      return `Perfect! What time were you born?
+
+Please reply in 24-hour format: HH:MM
+Example: 16:30 (for 4:30 PM)`
+
+    case 'place':
+      return `Almost done! Where were you born?
+
+Please reply: City, Country
+Example: Gaya, India`
+
+    case 'completed':
+      return `Thank you! I'm generating your cosmic profile now...`
+
+    default:
+      return getOnboardingMessage('name')
+  }
 }
 
-function parseOnboardingDetails(message: string) {
-  // Try different formats
-  const patterns = [
-    /(.+?),\s*(\d{1,2}\/\d{1,2}\/\d{4}),\s*(\d{1,2}:\d{2}),\s*(.+)$/, // "Name, DD/MM/YYYY, HH:MM, Place"
-    /(.+?)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}:\d{2})\s+(.+)$/, // "Name DD/MM/YYYY HH:MM Place"
-  ]
-
-  for (const pattern of patterns) {
-    const match = message.match(pattern)
-    if (match) {
-      const [, name, dob, time, place] = match
-      return {
-        name: name.trim(),
-        dateOfBirth: dob,
-        timeOfBirth: time,
-        placeOfBirth: place.trim()
-      }
-    }
+function validateAndParseDate(dateStr: string): { valid: boolean; formatted?: string } {
+  const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+  const match = dateStr.match(dateRegex)
+  
+  if (!match) return { valid: false }
+  
+  const [, day, month, year] = match
+  const dayNum = parseInt(day)
+  const monthNum = parseInt(month)
+  const yearNum = parseInt(year)
+  
+  if (dayNum < 1 || dayNum > 31) return { valid: false }
+  if (monthNum < 1 || monthNum > 12) return { valid: false }
+  if (yearNum < 1900 || yearNum > 2024) return { valid: false }
+  
+  return { 
+    valid: true, 
+    formatted: `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}` 
   }
+}
 
-  return null
+function validateAndParseTime(timeStr: string): { valid: boolean; formatted?: string } {
+  const timeRegex = /^(\d{1,2}):(\d{2})$/
+  const match = timeStr.match(timeRegex)
+  
+  if (!match) return { valid: false }
+  
+  const [, hour, minute] = match
+  const hourNum = parseInt(hour)
+  const minuteNum = parseInt(minute)
+  
+  if (hourNum < 0 || hourNum > 23) return { valid: false }
+  if (minuteNum < 0 || minuteNum > 59) return { valid: false }
+  
+  return { 
+    valid: true, 
+    formatted: `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}` 
+  }
+}
+
+function validatePlace(placeStr: string): { valid: boolean; formatted?: string } {
+  const parts = placeStr.split(',')
+  if (parts.length < 2) return { valid: false }
+  
+  const city = parts[0].trim()
+  const country = parts[parts.length - 1].trim()
+  
+  if (city.length < 2 || country.length < 2) return { valid: false }
+  
+  return { 
+    valid: true, 
+    formatted: `${city}, ${country}` 
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -130,79 +191,152 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[WhatsApp] Message from', fromNumber, ':', message)
+    console.log('[WhatsApp] User Name:', userName)
 
     // Check if user is onboarded
     const userProfile = userProfiles.get(fromNumber)
     const onboardingState = onboardingStates.get(fromNumber)
+    
+    console.log('[WhatsApp] User Profile exists:', !!userProfile)
+    console.log('[WhatsApp] Onboarding State:', onboardingState)
+    console.log('[WhatsApp] Current users in memory:', Array.from(userProfiles.keys()))
 
     // If user is not onboarded, start onboarding
     if (!userProfile) {
-      if (!onboardingState) {
-        // First time user - send onboarding form
-        onboardingStates.set(fromNumber, { step: 'started' })
-        await sendWhatsAppMessage(fromNumber, getOnboardingForm())
-        return NextResponse.json({ status: 'ok' }, { status: 200 })
+      const onboardingData: OnboardingData = onboardingStates.get(fromNumber) || { 
+        step: 'name', 
+        data: {} 
       }
-
-      // Try to parse onboarding details
-      const details = parseOnboardingDetails(message)
       
-      if (details) {
-        // Convert date format from DD/MM/YYYY to YYYY-MM-DD
-        const [day, month, year] = details.dateOfBirth.split('/')
-        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      console.log('[WhatsApp] Onboarding step:', onboardingData.step)
+      console.log('[WhatsApp] Onboarding data:', onboardingData.data)
 
-        // Save user profile
-        const userProfile = {
-          ...details,
-          dateOfBirth: formattedDate,
-          phone: fromNumber,
-          createdAt: new Date()
-        }
-        
-        userProfiles.set(fromNumber, userProfile)
-        onboardingStates.delete(fromNumber)
+      // Process based on current step
+      switch (onboardingData.step) {
+        case 'name':
+          // Save name and move to next step
+          onboardingData.data.name = message.trim()
+          onboardingData.step = 'dob'
+          onboardingStates.set(fromNumber, onboardingData)
+          await sendWhatsAppMessage(fromNumber, getOnboardingMessage('dob'))
+          return NextResponse.json({ status: 'ok' }, { status: 200 })
 
-        // Generate initial reading
-        try {
-          const birthChart = await getBirthChart({
-            name: userProfile.name,
-            dateOfBirth: userProfile.dateOfBirth,
-            timeOfBirth: userProfile.timeOfBirth,
-            placeOfBirth: userProfile.placeOfBirth,
-          })
+        case 'dob':
+          // Validate and save date of birth
+          const dateValidation = validateAndParseDate(message.trim())
+          if (!dateValidation.valid) {
+            await sendWhatsAppMessage(fromNumber, 
+              `Invalid date format. Please use DD/MM/YYYY format.\n\n` + getOnboardingMessage('dob')
+            )
+            return NextResponse.json({ status: 'ok' }, { status: 200 })
+          }
+          onboardingData.data.dateOfBirth = dateValidation.formatted
+          onboardingData.step = 'time'
+          onboardingStates.set(fromNumber, onboardingData)
+          await sendWhatsAppMessage(fromNumber, getOnboardingMessage('time'))
+          return NextResponse.json({ status: 'ok' }, { status: 200 })
 
-          const welcomeMessage = `🎉 Thank you ${userProfile.name}! Your cosmic profile is ready.
+        case 'time':
+          // Validate and save time of birth
+          const timeValidation = validateAndParseTime(message.trim())
+          if (!timeValidation.valid) {
+            await sendWhatsAppMessage(fromNumber, 
+              `Invalid time format. Please use HH:MM (24-hour) format.\n\n` + getOnboardingMessage('time')
+            )
+            return NextResponse.json({ status: 'ok' }, { status: 200 })
+          }
+          onboardingData.data.timeOfBirth = timeValidation.formatted
+          onboardingData.step = 'place'
+          onboardingStates.set(fromNumber, onboardingData)
+          await sendWhatsAppMessage(fromNumber, getOnboardingMessage('place'))
+          return NextResponse.json({ status: 'ok' }, { status: 200 })
 
-🌟 Your Zodiac Sign: ${birthChart.sun?.sign || 'Unknown'}
-🌙 Your Moon Sign: ${birthChart.moon?.sign || 'Unknown'}
-⭐ Your Ascendant: ${birthChart.ascendant?.sign || 'Unknown'}
+        case 'place':
+          // Validate and save place of birth
+          const placeValidation = validatePlace(message.trim())
+          if (!placeValidation.valid) {
+            await sendWhatsAppMessage(fromNumber, 
+              `Invalid place format. Please use "City, Country" format.\n\n` + getOnboardingMessage('place')
+            )
+            return NextResponse.json({ status: 'ok' }, { status: 200 })
+          }
+          onboardingData.data.placeOfBirth = placeValidation.formatted
+          onboardingData.step = 'completed'
+          
+          // Send completion message
+          await sendWhatsAppMessage(fromNumber, getOnboardingMessage('completed'))
+          
+          // Create user profile
+          const newUserProfile = {
+            ...onboardingData.data,
+            phone: fromNumber,
+            createdAt: new Date()
+          }
+          
+          userProfiles.set(fromNumber, newUserProfile)
+          onboardingStates.delete(fromNumber)
+
+          // Generate initial reading
+          try {
+            console.log('[WhatsApp] Generating birth chart for:', newUserProfile)
+            
+            const birthChart = await getBirthChart({
+              name: newUserProfile.name || 'User',
+              dateOfBirth: newUserProfile.dateOfBirth || '2000-01-01',
+              timeOfBirth: newUserProfile.timeOfBirth || '12:00',
+              placeOfBirth: newUserProfile.placeOfBirth || 'Unknown',
+            })
+
+            console.log('[WhatsApp] Birth chart result:', birthChart)
+
+            // Validate that we have real data (no "Unknown" signs)
+            if (birthChart.sun.sign === 'Unknown' || birthChart.moon.sign === 'Unknown' || birthChart.ascendant.sign === 'Unknown') {
+              throw new Error('Birth chart data is incomplete')
+            }
+
+            const welcomeMessage = `Thank you ${newUserProfile.name}! Your cosmic profile is ready.
+
+Your Zodiac Sign: ${birthChart.sun.sign}
+Your Moon Sign: ${birthChart.moon.sign}
+Your Ascendant: ${birthChart.ascendant.sign}
 
 I'm now ready to answer your questions! Ask me about:
-• Career guidance
-• Love compatibility  
-• Daily predictions
-• Lucky colors
-• Any astrology questions!
+Career guidance
+Love compatibility  
+Daily predictions
+Lucky colors
+Any astrology questions!
 
-What would you like to know? ✨`
+What would you like to know?`
 
-          await sendWhatsAppMessage(fromNumber, welcomeMessage)
+            await sendWhatsAppMessage(fromNumber, welcomeMessage)
+            return NextResponse.json({ status: 'ok' }, { status: 200 })
+
+          } catch (error) {
+            console.error('Error generating birth chart:', error)
+            await sendWhatsAppMessage(fromNumber, 
+              `I'm having trouble generating your birth chart right now. This could be due to:
+
+1. Invalid birth details provided
+2. API service temporarily unavailable
+3. Location coordinates not found
+
+Please try again in a few minutes, or double-check your birth details. If the issue persists, contact support.
+
+Your details:
+Name: ${newUserProfile.name}
+DOB: ${newUserProfile.dateOfBirth}
+Time: ${newUserProfile.timeOfBirth}
+Place: ${newUserProfile.placeOfBirth}`
+            )
+            return NextResponse.json({ status: 'ok' }, { status: 200 })
+          }
+
+        default:
+          // Start fresh onboarding
+          onboardingStates.set(fromNumber, { step: 'name', data: {} })
+          await sendWhatsAppMessage(fromNumber, getOnboardingMessage('name', userName))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
-
-        } catch (error) {
-          console.error('Error generating birth chart:', error)
-          await sendWhatsAppMessage(fromNumber, "I had trouble creating your birth chart. Please check your details and try again.")
-          return NextResponse.json({ status: 'ok' }, { status: 200 })
-        }
-      } else {
-        // Couldn't parse details, ask for clarification
-        await sendWhatsAppMessage(fromNumber, 
-          "I couldn't understand that format. Please send your details in this format:\n\n" +
-          "\"John Doe, 17/08/2002, 16:30, Gaya, India\"\n\n" +
-          "Or send them one by one. Let me know what you need help with!"
-        )
-        return NextResponse.json({ status: 'ok' }, { status: 200 })
       }
     }
 

@@ -47,7 +47,7 @@ export async function getBirthChart(
 
     console.log('[v0] Calling Astrology API with:', { day, month, year, hour, min, place: params.placeOfBirth })
 
-    // Use the chat API endpoint with x-astrologyapi-key header
+    // Use the birth details API endpoint to get actual zodiac signs
     const requestData = {
       language: "en",
       name: params.name,
@@ -57,25 +57,24 @@ export async function getBirthChart(
       hour: hour,
       min: min,
       place: params.placeOfBirth,
-      lat: (params.latitude || 0).toString(),
-      lon: (params.longitude || 0).toString(),
+      lat: (params.latitude || 19.17).toString(),
+      lon: (params.longitude || 73.7).toString(),
       tzone: "5.5",
       gender: "male",
       country: "INDIA",
       ap: "KUNDLI",
       sid: "astro-6",
       ep: "STANDARD",
-      ac: "VEDIC",
-      q: "hi"
+      ac: "VEDIC"
     }
 
     const response = await fetch(
-      'https://json-chat.astrologyapi.com/api/chat',
+      'https://json.astrologyapi.com/v1/birth_details',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-astrologyapi-key': apiKey,
+          'Authorization': `Basic ${Buffer.from(`${process.env.ASTROLOGY_USER_ID || '611768'}:${apiKey}`).toString('base64')}`,
         },
         body: JSON.stringify(requestData),
       }
@@ -90,74 +89,31 @@ export async function getBirthChart(
     const data = await response.json()
     console.log('[v0] Astrology API response:', data)
 
-    // Parse the response from Astrology API
+    // Parse the response from birth_details API
     return {
       name: params.name,
       dateOfBirth: params.dateOfBirth,
       timeOfBirth: params.timeOfBirth,
       placeOfBirth: params.placeOfBirth,
       sun: {
-        sign: data.sun?.sign || 'Unknown',
-        degree: data.sun?.degree || 0,
+        sign: data.sun_sign || data.sun?.sign || 'Unknown',
+        degree: data.sun_degree || data.sun?.degree || 0,
       },
       moon: {
-        sign: data.moon?.sign || 'Unknown',
-        degree: data.moon?.degree || 0,
+        sign: data.moon_sign || data.moon?.sign || 'Unknown',
+        degree: data.moon_degree || data.moon?.degree || 0,
       },
       ascendant: {
-        sign: data.ascendant?.sign || 'Unknown',
-        degree: data.ascendant?.degree || 0,
+        sign: data.ascendant_sign || data.ascendant?.sign || 'Unknown',
+        degree: data.ascendant_degree || data.ascendant?.degree || 0,
       },
       houses: data.houses || [],
     }
   } catch (error) {
     console.error('[v0] Failed to fetch birth chart:', error)
-    // Return mock data for development
-    return getMockBirthChart(params)
-  }
-}
-
-function getMockBirthChart(params: BirthChartParams): BirthChart {
-  const zodiacSigns = [
-    'Aries',
-    'Taurus',
-    'Gemini',
-    'Cancer',
-    'Leo',
-    'Virgo',
-    'Libra',
-    'Scorpio',
-    'Sagittarius',
-    'Capricorn',
-    'Aquarius',
-    'Pisces',
-  ]
-
-  const getRandomSign = () =>
-    zodiacSigns[Math.floor(Math.random() * zodiacSigns.length)]
-  const getRandomDegree = () => Math.floor(Math.random() * 30)
-
-  return {
-    name: params.name,
-    dateOfBirth: params.dateOfBirth,
-    timeOfBirth: params.timeOfBirth,
-    placeOfBirth: params.placeOfBirth,
-    sun: {
-      sign: getRandomSign(),
-      degree: getRandomDegree(),
-    },
-    moon: {
-      sign: getRandomSign(),
-      degree: getRandomDegree(),
-    },
-    ascendant: {
-      sign: getRandomSign(),
-      degree: getRandomDegree(),
-    },
-    houses: Array.from({ length: 12 }, (_, i) => ({
-      number: i + 1,
-      sign: getRandomSign(),
-      degree: getRandomDegree(),
-    })),
+    
+    // Instead of returning mock data, throw a proper error
+    // so the calling function can handle it appropriately
+    throw new Error(`Unable to generate birth chart: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
