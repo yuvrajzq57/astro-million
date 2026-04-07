@@ -48,6 +48,36 @@ export async function getBirthChart(
     console.log('[v0] Calling Astrology API with:', { day, month, year, hour, min, place: params.placeOfBirth })
 
     // Use the chat API to get zodiac signs and birth chart information
+    // Get coordinates for the birth place (simplified approach)
+    let latitude = 19.17 // Default for India
+    let longitude = 73.7  // Default for India
+    
+    // Common Indian city coordinates
+    const cityCoordinates: { [key: string]: { lat: number; lon: number } } = {
+      'gaya': { lat: 24.79, lon: 84.98 },
+      'saharsa': { lat: 25.88, lon: 86.60 },
+      'patna': { lat: 25.59, lon: 85.14 },
+      'delhi': { lat: 28.70, lon: 77.10 },
+      'mumbai': { lat: 19.07, lon: 72.87 },
+      'bangalore': { lat: 12.97, lon: 77.59 },
+      'kolkata': { lat: 22.57, lon: 88.36 },
+      'chennai': { lat: 13.08, lon: 80.27 },
+      'hyderabad': { lat: 17.38, lon: 78.48 },
+      'pune': { lat: 18.52, lon: 73.86 },
+    }
+    
+    // Extract city name from place
+    const placeLower = params.placeOfBirth.toLowerCase()
+    const cityName = placeLower.split(',')[0].trim()
+    
+    if (cityCoordinates[cityName]) {
+      latitude = cityCoordinates[cityName].lat
+      longitude = cityCoordinates[cityName].lon
+      console.log('[v0] Using coordinates for', cityName, ':', { latitude, longitude })
+    } else {
+      console.log('[v0] Using default coordinates for unknown city:', cityName)
+    }
+
     const requestData = {
       language: "en",
       name: params.name,
@@ -57,8 +87,8 @@ export async function getBirthChart(
       hour: hour,
       min: min,
       place: params.placeOfBirth,
-      lat: (params.latitude || 19.17).toString(),
-      lon: (params.longitude || 73.7).toString(),
+      lat: latitude.toString(),
+      lon: longitude.toString(),
       tzone: "5.5",
       gender: "male",
       country: "INDIA",
@@ -170,7 +200,52 @@ export async function getBirthChart(
         }
       }
 
+      // Validate zodiac sign based on birth date as fallback
+      const expectedSunSign = getZodiacSign(day, month)
+      console.log('[v0] Expected sun sign based on date:', expectedSunSign)
+      
+      // If API returns wrong sun sign, use calculated one
+      if (sunSign !== expectedSunSign) {
+        console.log('[v0] API sun sign incorrect, using calculated:', expectedSunSign)
+        sunSign = expectedSunSign
+      }
+
       console.log('[v0] Extracted signs from chat:', { sunSign, moonSign, ascendantSign })
+    }
+
+    function getZodiacSign(day: number, month: number): string {
+      const zodiacSigns = [
+        { name: "Capricorn", start: [12, 22], end: [1, 19] },
+        { name: "Aquarius", start: [1, 20], end: [2, 18] },
+        { name: "Pisces", start: [2, 19], end: [3, 20] },
+        { name: "Aries", start: [3, 21], end: [4, 19] },
+        { name: "Taurus", start: [4, 20], end: [5, 20] },
+        { name: "Gemini", start: [5, 21], end: [6, 20] },
+        { name: "Cancer", start: [6, 21], end: [7, 22] },
+        { name: "Leo", start: [7, 23], end: [8, 22] },
+        { name: "Virgo", start: [8, 23], end: [9, 22] },
+        { name: "Libra", start: [9, 23], end: [10, 22] },
+        { name: "Scorpio", start: [10, 23], end: [11, 21] },
+        { name: "Sagittarius", start: [11, 22], end: [12, 21] }
+      ]
+
+      for (const sign of zodiacSigns) {
+        const [startMonth, startDay] = sign.start
+        const [endMonth, endDay] = sign.end
+        
+        if (startMonth === endMonth) {
+          if (month === startMonth && day >= startDay && day <= endDay) {
+            return sign.name
+          }
+        } else {
+          if ((month === startMonth && day >= startDay) || 
+              (month === endMonth && day <= endDay)) {
+            return sign.name
+          }
+        }
+      }
+      
+      return "Unknown"
     }
 
     return {

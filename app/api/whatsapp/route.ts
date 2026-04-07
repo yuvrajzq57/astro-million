@@ -223,14 +223,13 @@ export async function POST(request: NextRequest) {
     console.log('[WhatsApp] User Profile exists:', !!userProfile)
     console.log('[WhatsApp] Onboarding State:', onboardingState)
     console.log('[WhatsApp] Current users in memory:', Array.from(userProfiles.keys()))
+    console.log('[WhatsApp] Current onboarding states:', Array.from(onboardingStates.keys()))
 
     // If user is not onboarded, start onboarding
     if (!userProfile) {
       let onboardingData: OnboardingData = onboardingStates.get(fromNumber)
       
-      console.log('[WhatsApp] Current onboarding data:', onboardingData)
-      console.log('[WhatsApp] Current users in memory:', Array.from(userProfiles.keys()))
-      console.log('[WhatsApp] Current onboarding states:', Array.from(onboardingStates.keys()))
+      console.log('[WhatsApp] Current onboarding data for', fromNumber, ':', onboardingData)
       
       // First, try to parse single-line format (fallback)
       const singleLineDetails = parseOnboardingDetails(message)
@@ -313,7 +312,7 @@ Place: ${newUserProfile.placeOfBirth}`
       
       // If no onboarding data exists, start fresh
       if (!onboardingData) {
-        console.log('[WhatsApp] Starting fresh onboarding for new user')
+        console.log('[WhatsApp] No onboarding data found, starting fresh for', fromNumber)
         onboardingData = { step: 'name', data: {} }
         onboardingStates.set(fromNumber, onboardingData)
         console.log('[WhatsApp] Set new onboarding state:', onboardingData)
@@ -329,10 +328,15 @@ Place: ${newUserProfile.placeOfBirth}`
         case 'name':
           // Save name and move to next step
           console.log('[WhatsApp] Processing name step, received:', message)
+          console.log('[WhatsApp] Before update - onboardingData:', onboardingData)
+          
           onboardingData.data.name = message.trim()
           onboardingData.step = 'dob'
           onboardingStates.set(fromNumber, onboardingData)
-          console.log('[WhatsApp] Updated onboarding state:', onboardingData)
+          
+          console.log('[WhatsApp] After update - onboardingData:', onboardingData)
+          console.log('[WhatsApp] Stored onboarding state:', onboardingStates.get(fromNumber))
+          
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('dob'))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
 
@@ -349,7 +353,6 @@ Place: ${newUserProfile.placeOfBirth}`
           onboardingData.data.dateOfBirth = dateValidation.formatted
           onboardingData.step = 'time'
           onboardingStates.set(fromNumber, onboardingData)
-          console.log('[WhatsApp] Updated onboarding state:', onboardingData)
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('time'))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
 
@@ -366,7 +369,6 @@ Place: ${newUserProfile.placeOfBirth}`
           onboardingData.data.timeOfBirth = timeValidation.formatted
           onboardingData.step = 'place'
           onboardingStates.set(fromNumber, onboardingData)
-          console.log('[WhatsApp] Updated onboarding state:', onboardingData)
           await sendWhatsAppMessage(fromNumber, getOnboardingMessage('place'))
           return NextResponse.json({ status: 'ok' }, { status: 200 })
 
