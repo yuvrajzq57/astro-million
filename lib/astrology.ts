@@ -47,7 +47,7 @@ export async function getBirthChart(
 
     console.log('[v0] Calling Astrology API with:', { day, month, year, hour, min, place: params.placeOfBirth })
 
-    // Use the birth details API endpoint to get actual zodiac signs
+    // Use birth details API endpoint to get actual zodiac signs
     const requestData = {
       language: "en",
       name: params.name,
@@ -68,13 +68,22 @@ export async function getBirthChart(
       ac: "VEDIC"
     }
 
+    console.log('[v0] API Request:', {
+      url: 'https://api.astrologyapi.com/v1/birth_details',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: requestData
+    })
+
     const response = await fetch(
-      'https://json.astrologyapi.com/v1/birth_details',
+      'https://api.astrologyapi.com/v1/birth_details',
       {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'x-astrologyapi-key': apiKey,
         },
         body: JSON.stringify(requestData),
       }
