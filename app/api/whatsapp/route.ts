@@ -158,6 +158,29 @@ function validatePlace(placeStr: string): { valid: boolean; formatted?: string }
   }
 }
 
+function parseOnboardingDetails(message: string) {
+  // Try different formats
+  const patterns = [
+    /(.+?),\s*(\d{1,2}\/\d{1,2}\/\d{4}),\s*(\d{1,2}:\d{2}),\s*(.+)$/, // "Name, DD/MM/YYYY, HH:MM, Place"
+    /(.+?)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}:\d{2})\s+(.+)$/, // "Name DD/MM/YYYY HH:MM Place"
+  ]
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern)
+    if (match) {
+      const [, name, dob, time, place] = match
+      return {
+        name: name.trim(),
+        dateOfBirth: dob,
+        timeOfBirth: time,
+        placeOfBirth: place.trim()
+      }
+    }
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -206,6 +229,85 @@ export async function POST(request: NextRequest) {
       let onboardingData: OnboardingData = onboardingStates.get(fromNumber)
       
       console.log('[WhatsApp] Current onboarding data:', onboardingData)
+      
+      // First, try to parse single-line format (fallback)
+      const singleLineDetails = parseOnboardingDetails(message)
+      if (singleLineDetails && !onboardingData) {
+        console.log('[WhatsApp] Parsed single-line details:', singleLineDetails)
+        
+        // Convert date format from DD/MM/YYYY to YYYY-MM-DD
+        const [day, month, year] = singleLineDetails.dateOfBirth.split('/')
+        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+
+        // Create user profile directly
+        const newUserProfile = {
+          ...singleLineDetails,
+          dateOfBirth: formattedDate,
+          phone: fromNumber,
+          createdAt: new Date()
+        }
+        
+        userProfiles.set(fromNumber, newUserProfile)
+        onboardingStates.delete(fromNumber)
+
+        console.log('[WhatsApp] User profile created from single line:', newUserProfile)
+
+        // Generate initial reading
+        try {
+          console.log('[WhatsApp] Generating birth chart for:', newUserProfile)
+          
+          const birthChart = await getBirthChart({
+            name: newUserProfile.name || 'User',
+            dateOfBirth: newUserProfile.dateOfBirth || '2000-01-01',
+            timeOfBirth: newUserProfile.timeOfBirth || '12:00',
+            placeOfBirth: newUserProfile.placeOfBirth || 'Unknown',
+          })
+
+          console.log('[WhatsApp] Birth chart result:', birthChart)
+
+          // Validate that we have real data (no "Unknown" signs)
+          if (birthChart.sun.sign === 'Unknown' || birthChart.moon.sign === 'Unknown' || birthChart.ascendant.sign === 'Unknown') {
+            throw new Error('Birth chart data is incomplete')
+          }
+
+          const welcomeMessage = `Thank you ${newUserProfile.name}! Your cosmic profile is ready.
+
+Your Zodiac Sign: ${birthChart.sun.sign}
+Your Moon Sign: ${birthChart.moon.sign}
+Your Ascendant: ${birthChart.ascendant.sign}
+
+I'm now ready to answer your questions! Ask me about:
+Career guidance
+Love compatibility  
+Daily predictions
+Lucky colors
+Any astrology questions!
+
+What would you like to know?`
+
+          await sendWhatsAppMessage(fromNumber, welcomeMessage)
+          return NextResponse.json({ status: 'ok' }, { status: 200 })
+
+        } catch (error) {
+          console.error('Error generating birth chart:', error)
+          await sendWhatsAppMessage(fromNumber, 
+            `I'm having trouble generating your birth chart right now. This could be due to:
+
+1. Invalid birth details provided
+2. API service temporarily unavailable
+3. Location coordinates not found
+
+Please try again in a few minutes, or double-check your birth details. If the issue persists, contact support.
+
+Your details:
+Name: ${newUserProfile.name}
+DOB: ${newUserProfile.dateOfBirth}
+Time: ${newUserProfile.timeOfBirth}
+Place: ${newUserProfile.placeOfBirth}`
+          )
+          return NextResponse.json({ status: 'ok' }, { status: 200 })
+        }
+      }
       
       // If no onboarding data exists, start fresh
       if (!onboardingData) {

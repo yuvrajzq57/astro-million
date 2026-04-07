@@ -69,21 +69,21 @@ export async function getBirthChart(
     }
 
     console.log('[v0] API Request:', {
-      url: 'https://api.astrologyapi.com/v1/birth_details',
+      url: 'https://json.astrologyapi.com/v1/birth_details',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'x-astrologyapi-key': apiKey,
       },
       body: requestData
     })
 
     const response = await fetch(
-      'https://api.astrologyapi.com/v1/birth_details',
+      'https://json.astrologyapi.com/v1/birth_details',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+          'x-astrologyapi-key': apiKey,
         },
         body: JSON.stringify(requestData),
       }
